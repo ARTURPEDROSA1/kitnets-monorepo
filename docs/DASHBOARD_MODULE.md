@@ -1,174 +1,148 @@
 # Dashboard (`/dashboard`)
 
-**Version:** 1.1
-**Last updated:** 2026-10-04
+**Version:** 2.0
+**Last updated:** 2026-10-12
 **Author:** Kitnets Engineering
 
 ---
 
 ## 1. Overview
 
-The dashboard is the owner's landing page after signing in: the whole portfolio in one panel. It shows the
-headline figures of the carteira, a Google map of the rental properties, the live projects and the agencies
-with a contract in force, an "Atenção" list merged from every module and one card per module with that
-module's own figures. It only reads: there are no action buttons in its header — adding a property and
-importing a contract live in Imóveis.
+The dashboard is the owner's landing page after signing in, and it answers one question first: **did this
+month's rent come in?** A four-part strip (esperado, recebido, a vencer, vencido) sits over the month's rents,
+shown as a board (a spreadsheet in due-date order) or as a calendar; beside it the month's bills and
+instalments, the contract dates ahead and the result of the last closed month; under it the portfolio
+(occupancy, contracted rent, the potential saving of self-management). Receipts posted since the owner's last
+visit stay lit for the visit. The page only reads: every row and card opens its own hub.
 
-Every number is the number the module's own hub shows: the dashboard's maths (`lib/dashboard-hub.ts`) is
-built on the hubs' pure modules (`lease-dashboard`, `tenant-dashboard`, `agent-dashboard`,
-`agency-dashboard`, `energy-hub`, `water-hub`, `condominium-hub`, `project-hub`, `property-taxes`).
-Strings are hard-coded pt-BR like every hub; `lang` only builds links.
+Every number is the number the hubs and the ledger show: the maths (`lib/dashboard-hub.ts`) is built on
+`lease-dashboard`, `property-income`, `invoice-hub`, `energy-hub`, `water-hub` and `property-taxes`. Strings
+are hard-coded pt-BR like every hub; `lang` only builds links. Product context for design work lives in
+`apps/web/PRODUCT.md`; the page's direction contract in `apps/web/.impeccable/surfaces/`.
 
-The gateways ("Meus Gateways") are a founder-only pilot, not a product of Kitnets.com: since 2026-10-04
-the block sits at the bottom of `/proprietario`, rendered only for the accounts in `GATEWAY_PILOT_EMAILS`
-(default `pedrosa.ac@gmail.com`); see `docs/GATEWAY_DASHBOARD_MANUAL.md`.
+The gateways ("Meus Gateways") are a founder-only pilot at the bottom of `/proprietario`
+(`GATEWAY_PILOT_EMAILS`); see `docs/GATEWAY_DASHBOARD_MANUAL.md`.
 
 ## 2. Files
 
 ```
 apps/web/src/app/[lang]/dashboard/
-  page.tsx                          # server: requireProfile() → loadDashboard() → <DashboardContent initial>
-  DashboardContent.tsx              # client: the bundle, today, the pure figures, the one-off geocoding call
+  page.tsx                          # server: requireProfile() → loadDashboard() → <DashboardContent initial>; skeleton fallback
+  DashboardContent.tsx              # client: the bundle, today, the month shown, board/calendar (view:dashboard), seen:dashboard
 apps/web/src/components/dashboard/
-  DashboardHub.tsx                  # the page: headline Tiles, map + Atenção, one card per module
-  PortfolioMap.tsx                  # Google map (@vis.gl/react-google-maps) with legend and popups; a list without a key
+  DashboardHub.tsx                  # the page: header, strip, side column, portfolio cards, "?" dialog
+  RentBoard.tsx                     # the board (spreadsheet machinery: sort, filter, hide, cell sums)
+  RentCalendar.tsx                  # the calendar; an agenda list on phones
+  ink.ts                            # the status text colours (CSS variables --dash-* in globals.css)
 apps/web/src/lib/
   dashboard-views.ts                # DashboardView (types only)
-  dashboard-views-server.ts         # loadDashboard(), loadMapPins(), loadIncomeSnapshots(), loadTaxRowsByOwner()
-  dashboard-hub.ts (+ test)         # occupancyOf, incomeFigures, taxFigures, dashboardTotals, dashboardAttention (pure)
-  project-hub.ts (+ test)           # projectHubTotals, mappableProjects (pure; shared with Projetos)
-  property-entries-server.ts (+ test) # the profile JSON's properties paired with `properties` rows (address, units, photos)
-  geocode.ts (+ test)               # address keys, geocoder query, adapters, attachGeocodes, pinBounds (pure)
-  geocode-server.ts                 # the `geocodes` cache, Google Geocoding / BrasilAPI CEP
+  dashboard-views-server.ts         # loadDashboard(), loadDashboardLedger(), loadTaxRowsByOwner()
+  dashboard-hub.ts (+ test)         # monthRents, rentTotals, freshRentIds, monthOutflows, contractDates, monthResult, occupancyOf… (pure)
+  map-pins-server.ts                # the portfolio's map pins (POST /api/geocode); no page draws them since v2.0
 apps/web/src/app/api/dashboard/route.ts   # GET: the bundle
-apps/web/src/app/api/geocode/route.ts     # POST: geocode up to 25 missing addresses, return the pins
-supabase/migrations/20260925190000_geocodes.sql
 docs/DASHBOARD_MODULE.md
 ```
 
 ## 3. The page
 
-### 3.1 Headline (six `Tile`s, each with the "?" explanation)
+### 3.1 Header
 
-| Tile | Value | Source |
+"Aluguéis de {mês}" with ‹ › to walk back through the last twelve months; "Hoje, dd/mm" and how many receipts
+are new since the last visit; the Quadro | Calendário switch (remembered in the account as `view:dashboard`)
+and the "?" with how to read the page.
+
+### 3.2 The strip
+
+| Part | Figure | Rule |
 |---|---|---|
-| Imóveis | properties; units and occupancy in the hint | `PropertyEntry[]`, `occupancyOf` |
-| Receita do mês | Σ of each property's latest confirmed ledger month; NOI, margin and the month in the hint | `loadIncomeSnapshots` (the same maths as `GET /api/properties/income-summary`), `incomeFigures` |
-| Aluguel contratado | Σ monthly rent of the contracts in force (ACTIVE / EXPIRING_SOON); next end in the hint | `hubTotals` |
-| Pessoas abrigadas | distinct people (titular, co-tenants, occupants) on contracts in force | `TenantListView.leases` |
-| Empregos apoiados | active corretores; those with a contract and the agencies with a contract in force in the hint | `agentHubTotals`, `agencyRows` |
-| Impostos pagos em {ano} | IPTU + ITBI/outros paid by the owner from January to this month, in the month paid; "federais em breve" | `taxFigures` (no TaxScope: at portfolio level property + condominium IPTU add up to what the owner paid once) |
+| Esperado em {mês} | Σ contract rent of every contract that owes rent in the month | `monthRents` + `rentTotals` |
+| Recebido | Σ gross rent the ledger confirmed (or a paid invoice); the net under it | `received.gross` / `received.net` |
+| A vencer | Σ contract rent not in yet, due date today or ahead; the next date | `status = a_vencer` |
+| Vencido | Σ contract rent not in yet, due date passed; since when | `status = vencido` |
 
-**Occupancy** = units with a contract in force ÷ rentable units. A multi-unit property counts each unit
-named by a lease once, plus one per lease that names no unit (saved before leases pointed to units, or on
-the whole building), never more than its units; a single-family property counts one; an entry without a
-`properties` row cannot have leases yet. This differs from the property page's
-"Ocupação" (lifetime months with rent) on purpose: the dashboard answers "how full is it today".
+A thin bar along its bottom splits recebido / a vencer / vencido.
 
-### 3.2 Map
+**Who owes rent in a month** (`owesRentIn`): never a draft or a cancelled contract, never in the contract's
+first month (its first rent falls due the month after, the ledger's rule), a closed contract until its end, a
+contract in force with a tenant's notice until the move-out day; a contract in force past its term keeps
+paying. The due date is the contract's due day in the month (the month's last day when shorter), or the
+month's Kitnets invoice due date when the owner bills it.
 
-`PortfolioMap` draws three kinds of pins: rental properties (emerald), live projects (amber: status
-ACTIVE and not promoted to a property) and agencies with at least one contract in force (violet). The
-legend toggles kinds; a pin opens a popup with the address and a link. The view fits the shown pins
-(street level for one, the country for none). Without `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` the same pins are
-listed instead.
+**What came in** is read from the income ledger (`property_income_months`, confirmed rows): a unit's contract
+reads that unit's rows; a whole-property contract reads the rows saved without a unit, or every row of the
+property when it is the only contract paying there that month. A paid Kitnets invoice counts even before the
+ledger shows it. Without a receipt a rent past its due date is **vencido**, and the board says "sem lançamento"
+unless an invoice is late: until the bank statement sync is live, vencido may also mean a deposit nobody posted
+yet. When the ledger has nothing for the previous month, an amber note says so.
 
-Coordinates come from the `geocodes` cache, keyed by the normalized address (`normalizeAddressKey`:
-lowercase, accent-free parts, CEP digits, country) — not by entity, because a property that lives only in
-the profile JSON has no row and `properties.address` is a one-time copy. The page reads the cache only;
-addresses it does not know are reported as `map.pending` and the client calls `POST /api/geocode` (up to
-three batches per visit, stopping when nothing is left or nothing could be asked), which geocodes up to 25 of them with Google's Geocoding API (`GOOGLE_MAPS_SERVER_KEY`) or, without a
-server key, BrasilAPI's CEP coordinates (CEP-level), writes them and returns the pins. Positive results
-are permanent; negatives are retried after 30 days; a BrasilAPI result is upgraded the first time a Google
-key exists — and keeps its CEP position when Google finds nothing better. Pins that share a position (a
-CEP-level answer covers a street or a small town) are spread on a small circle so each can be clicked. The
-legend is a Google map control and the notes about the addresses sit under the map, so the Google logo and
-controls are never covered.
+### 3.3 Board and calendar
 
-### 3.3 Atenção
+**Quadro** (`RentBoard`, table key `dashboard-rents`): Venc. (a dot in the status colour), Contrato (the unit
+first, the building and the tenant under it), Situação (recebido dd/mm, vence em N dias, vencido há N dias,
+the invoice number when unpaid), Aluguel, Recebido, Líquido, Gestão (with the agency's %). Sums at the bottom;
+sorted by due date in the current month a "hoje, dd/mm" line splits what fell due from what is ahead.
 
-`dashboardAttention` merges the modules' own lists (`attentionItems`, `tenantAttention`,
-`agentAttention`, `agencyAttention`, `energyAttention`, `waterAttention`, `condoAttention`) plus the
-projects' overdue instalments (rose) and instalments due within 7 days (amber), each tagged with its module
-and linked to the record. Order: rose, amber, sky, emerald, slate; modules in their order within a tone.
-The panel shows six and "ver todos".
+**Calendário** (`RentCalendar`): Sunday first; each rent on its due day coloured by status, three or more
+rents of one property on one day folded into one chip, except an overdue rent, which always keeps its own
+chip; the month's bills, instalments, adjustments and contract ends beside them. A day whose rents all came in
+turns emerald, a day with an overdue rent rose; today is outlined. Below `md` it is the list of the days that
+have something.
 
-### 3.4 Module cards
+**Novo**: the preference `seen:dashboard` keeps the newest ledger change a visit has seen (`newestLedgerChange`,
+saved four seconds into the visit, this device's copy and the account's). Receipts whose row changed after it
+are lit (`freshRentIds`) for the whole visit; a first visit lights nothing.
 
-One card per module (Imóveis, Contratos, Inquilinos, Corretores, Imobiliárias, Energia, Água, Condomínio,
-Projetos, Tributos) with four figures each, taken from the module's hub totals (`hubTotals`,
-`tenantHubTotals`, `agentHubTotals`, `agencyHubTotals`, `energyHubTotals` over the rental units only,
-`waterHubTotals`, `condoHubTotals`, `projectHubTotals`, `taxFigures`). "Economia potencial" on the Imóveis
-card is the agencies' accumulated fee from the income ledger (`summarize().totalFee`), the SaaS value
-proposition. The Projetos money figures are the hub's "Em andamento" slice (ACTIVE / ARCHIVED); sold projects
-only add to the realized gain. A loader that failed shows "Não foi possível carregar" on its card and "—"
-with "… indisponíveis" on the headline tiles that depend on it, never zeros.
+### 3.4 Side column
 
-### 3.5 Empty and new accounts
+Beside the board from 85rem, under it below that. **Contas e parcelas** (current month only): the newest
+energy bill of each rental unit and the newest water bill of each property due in the month, the projects'
+next instalment due in the month and the projects with instalments already late. **Datas dos contratos**: the
+adjustments and ends of the contracts in force in the next 60 days (in the month, for a past month); no
+adjustment after a term still running out. **Resultado de {mês}**: the last closed month (or the month shown,
+when past) from the confirmed ledger rows with the owner's IPTU of the month as a cost — NOI, margin, and one
+bar of the revenue split into the agencies' fee, other costs and the result.
 
-A brand-new account lands on `/dashboard` right after signing up, sometimes before its profile row
-exists: `requireProfile()` answers 403, the page renders the unseeded client, which calls
-`POST /api/profiles/create` and then `GET /api/dashboard`. With nothing registered the page shows a
-"Comece pela carteira" note above the zeros with one link, "Ir para Imóveis", where the owner adds a
-property or imports a lease agreement.
+### 3.5 A carteira
 
-The old page's write-on-GET behaviours (relinking a profile by an unverified e-mail, nulling legacy
-`property_*` columns) were not kept: the create route relinks by verified e-mail only, and the dashboard
-counts properties through the same pairing the Imóveis page uses.
+Ocupação (units with a contract in force, one square per unit up to 60; people housed), Aluguel contratado
+(Σ rent in force split by management), Economia potencial com autogestão (the agencies' fee over every
+confirmed month, the last twelve beside it — the SaaS value proposition).
+
+### 3.6 Empty, loading and failures
+
+A brand-new account may land before its profile row exists: the unseeded client calls
+`POST /api/profiles/create` and then `GET /api/dashboard`. With nothing registered the page shows "Comece pela
+carteira" with a link to Imóveis. Loading draws the strip, board and side column as shapes. A loader that fails
+is listed under the page; the strip reads the failure instead of zeros when contracts or the ledger are down.
 
 ## 4. Data
 
-`loadDashboard(supabase, profileId, userId)` runs every loader in parallel and records failures in
-`failed` instead of throwing: `loadPropertyEntries`, `loadTaxRowsByOwner`, `loadLeaseRows`,
-`loadTenantList`, `loadAgentList`, `loadAgencyList`, `getOwnerPropertiesSummary(userId)`,
-`getOwnerWaterPropertiesSummary(userId)`, `loadCondominiumList`, `loadInvestmentList` (metrics computed
-without signing photos), then `loadIncomeSnapshots` and the map pins. The
-energy and water loaders take the Clerk `userId` and, like the hubs, create `properties` rows for
-profile-JSON properties still without one — so they run one after the other on a single energy result
-(`getOwnerWaterPropertiesSummary(userId, energy)`): two concurrent runs would both insert the missing row.
-The income snapshot applies the condominium's IPTU scope to properties with sub-units, like
-`GET /api/properties/income-summary`.
+`loadDashboard(supabase, profileId, userId)` runs the loaders in parallel and records failures in `failed`:
+`loadPropertyEntries`, `loadTaxRowsByOwner`, `loadLeaseRows`, `loadTenantList` (only the count of people
+housed is kept), the energy then water summaries (in sequence on one energy result: two concurrent runs would
+both create the missing `properties` row), `loadInvestmentList` (metrics without signing photos),
+`loadInvoiceRows` and `loadDashboardLedger`. The ledger loader pages through every confirmed row (for the
+all-time and twelve-month agency fee, per property like the property cards) and the expected rows of the
+window, and ships the last twelve months of rows with `updated_at`.
 
-`GET /api/dashboard` returns the same bundle; `POST /api/geocode` takes no body (the addresses come from the
-account's own registers) and is limited to 10 calls per user per hour.
+## 5. Design decisions
 
-## 5. Environment
+- **Money first.** The owner chose (2026-10-12) "did the money arrive?" as the page's first answer, a layout
+  for landlords at large, and the app's look kept. Map, Atenção list, social figures and module cards were not
+  required to survive; the board and the calendar won the layout round.
+- **No accusation without evidence.** "Vencido" means the ledger has no receipt; the board says "sem
+  lançamento" unless a Kitnets invoice is late.
+- **Colours from variables.** Tailwind's `dark:` follows the system while the app's theme is a class; the
+  status text colours come from `--dash-*` so they follow the theme.
+- **The map is parked.** `PortfolioMap`, the geocode cache and `POST /api/geocode` stay in the code for
+  whichever page shows the pins next; the dashboard no longer calls them.
 
-| Variable | Where | Purpose |
-|---|---|---|
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | browser | Maps JavaScript API key, HTTP-referrer restricted (kitnets.com, the Vercel previews, localhost). Empty = the pins are listed instead of mapped. |
-| `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | browser | Cloud-console Map ID for advanced markers; Google's demo id when empty. |
-| `GOOGLE_MAPS_SERVER_KEY` | server | Geocoding API key, IP/API restricted. Empty = BrasilAPI CEP coordinates. |
+## 6. Changelog
 
-All optional: previews and local builds do not need them. `NEXT_PUBLIC_*` values are inlined at build
-time, so adding them in Vercel needs a redeploy.
-
-**Before setting `GOOGLE_MAPS_SERVER_KEY`, put a daily request quota on the Geocoding API in the Google Cloud
-console.** The per-user limit (10 calls × 25 addresses per hour) bounds one account, not the total across
-accounts; only the quota caps the bill.
-
-## 6. Design decisions
-
-- **Tiles, not the hubs' `Item`.** The dashboard is a set of figures to explain, not a strip above a
-  filterable list, so it uses `components/properties/Tile` with the "?" popup like every entity dashboard.
-- **Cache keyed by address.** See §3.2. An edited address is a new key; nothing needs invalidating.
-- **No federal-tax estimate.** The calculators' formulas need a regime the profile does not store; the tile
-  says "em breve, via Contábil & Fiscal" until that module produces real figures.
-- **Rental units only for Energia.** The owner's own home or a relative's consumer unit is not a portfolio
-  cost; the Energia hub keeps showing them.
-
-## 7. Changelog
-
-- **2026-10-04 (v1.1)** — "Importar contrato" and "Novo imóvel" removed from the header (they live in Imóveis;
-  "Novo imóvel" opened Adicionar Propriedade over the wizard of the first property). The empty account's note
-  links to Imóveis only, and Imóveis no longer reads `?add=true`. "Meus Gateways" moved to the bottom of
-  `/proprietario` (pilot accounts only); `DashboardView.gateways` and the `gateways` loader removed.
-- **2026-09-25 (v1.0, review)** — Energy and water loaders run in sequence on one result (no duplicate `properties`
-  rows); occupancy counts every unit-less lease; Projetos figures follow the hub's slices; taxes YTD stop at
-  this month; unavailable figures read "—"; map legend as a Google control, notes under the map, overlapping pins
-  spread, a CEP position kept when Google finds nothing, up to three geocoding batches per visit, 10 calls/hour;
-  gateways fallback to other accounts' readings removed; `?importar=1` on Contratos.
-- **2026-09-25 (v1.0)** — The dashboard rebuilt: headline Tiles, Google map with geocode cache, merged
-  Atenção, one card per module, gateways gated to the pilot accounts; `lib/dashboard-hub.ts`,
-  `project-hub.ts`, `property-entries-server.ts`, `geocode.ts` with tests; `GET /api/dashboard`,
-  `POST /api/geocode`; migration `20260925190000_geocodes`.
+- **2026-10-12 (v2.0)** — Redesigned money first: strip + board / calendar of the month's rents, side column
+  (bills and instalments, contract dates, the closed month's result), portfolio cards, "novo" since the last
+  visit (`seen:` preference kind), month navigation over twelve months. Map, Atenção, headline tiles and module
+  cards removed; agents, agencies and condominium loaders dropped; map pins moved to `lib/map-pins-server.ts`.
+- **2026-10-04 (v1.1)** — Header actions removed; "Meus Gateways" moved to `/proprietario`.
+- **2026-09-25 (v1.0)** — Portfolio panel: headline Tiles, Google map with geocode cache, merged Atenção, one
+  card per module.

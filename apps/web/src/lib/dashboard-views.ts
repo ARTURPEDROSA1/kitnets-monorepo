@@ -1,67 +1,50 @@
 /**
- * What the dashboard shows, as one bundle: the modules' own list views side by side, the portfolio's
- * income snapshot, the taxes register and the map pins. Built by
- * lib/dashboard-views-server.ts (`loadDashboard`), read by lib/dashboard-hub.ts (pure) and the client.
- * Types only: safe for client components.
+ * What the dashboard shows, as one bundle: the leases, the income ledger of the last twelve months, the
+ * invoices, the bills, the project instalments and the taxes register, plus the few portfolio figures
+ * the cards under the board need. Built by lib/dashboard-views-server.ts (`loadDashboard`), read by
+ * lib/dashboard-hub.ts (pure) and the client. Types only: safe for client components.
  */
-import type { AgencyListView } from "@/lib/agency-views";
-import type { AgentListView } from "@/lib/agent-views";
-import type { Condominium } from "@/lib/condominium";
 import type { OwnerPropertySummary } from "@/lib/energy-properties-server";
-import type { MapPin } from "@/lib/geocode";
 import type { InvestmentCardSummary } from "@/lib/new-investment-metrics";
 import type { NewInvestment } from "@/lib/new-investments";
 import type { PropertyEntry } from "@/lib/property-entries-server";
+import type { PropertyIncomeRow } from "@/lib/property-income";
 import type { PropertyTax } from "@/lib/property-taxes";
-import type { TenantListView } from "@/lib/tenant-views";
 import type { WaterPropertySummary } from "@/lib/water-properties-server";
 import type { LeaseWithDetails } from "@/types/lease";
 import type { InvoiceView } from "@/lib/invoice-views";
 
-/** One property's latest confirmed ledger month plus its all-time agency fee (the "economia potencial com autogestão"). */
-export interface DashboardIncomeSnapshot {
-    propertyId: string;
-    /** YYYY-MM */
-    month: string;
-    revenue: number;
-    grossRent: number;
-    netRent: number;
-    received: number;
-    /** the agency's cut in that month (rent and, when agreed, condominium) */
-    feeAmount: number;
-    /** agency fee + energy cost + other expenses + condominium + landlord IPTU of the month */
-    opex: number;
-    noi: number;
-    /** confirmed months, all time */
-    confirmedMonths: number;
-    /** agency fee kept before crediting, all time */
-    totalFee: number;
-    /** the same over the last 12 confirmed months */
+/** How many months the board can look back, the current one included. */
+export const DASHBOARD_MONTHS = 12;
+
+export interface DashboardLedger {
+    /** `YYYY-MM`: the first month of the window */
+    from: string;
+    /** `YYYY-MM`: the current month, the last of the window */
+    to: string;
+    /** every ledger row of the window, confirmed and expected, with `updated_at` (what is new since the last visit) */
+    rows: PropertyIncomeRow[];
+    /** the agencies' fee kept before crediting, over every confirmed month: the potential saving of self-management */
+    feeAllTime: number;
+    /** the same over each property's last twelve confirmed months */
     fee12m: number;
 }
 
-export type DashboardLoader = "properties" | "income" | "leases" | "tenants" | "agents" | "agencies" | "energy" | "water" | "condominiums" | "projects" | "taxes" | "invoices" | "map";
+export type DashboardLoader = "properties" | "income" | "leases" | "tenants" | "energy" | "water" | "projects" | "taxes" | "invoices";
 
 export interface DashboardView {
     profile: { fullName: string | null; email: string | null };
     properties: PropertyEntry[];
-    income: DashboardIncomeSnapshot[];
     leases: LeaseWithDetails[] | null;
-    tenants: TenantListView | null;
-    agents: AgentListView | null;
-    agencies: AgencyListView | null;
-    energy: OwnerPropertySummary[] | null;
-    water: WaterPropertySummary[] | null;
-    condominiums: Condominium[] | null;
-    projects: { investments: NewInvestment[]; summaries: Record<string, InvestmentCardSummary> } | null;
-    taxes: PropertyTax[] | null;
+    ledger: DashboardLedger | null;
+    /** distinct people (titular, co-tenants, occupants) on contracts in force */
+    housed: number | null;
     /** the account's invoices (Fatura), with the latest boleto and e-mail of each */
     invoices: InvoiceView[] | null;
-    map: {
-        pins: MapPin[];
-        /** addresses still to geocode (the client asks POST /api/geocode once) */
-        pending: number;
-    };
+    energy: OwnerPropertySummary[] | null;
+    water: WaterPropertySummary[] | null;
+    projects: { investments: NewInvestment[]; summaries: Record<string, InvestmentCardSummary> } | null;
+    taxes: PropertyTax[] | null;
     /** the loaders that failed: their figures show as unavailable, not as zero */
     failed: DashboardLoader[];
 }

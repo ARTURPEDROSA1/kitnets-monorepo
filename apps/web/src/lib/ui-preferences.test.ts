@@ -3,8 +3,8 @@ import {
     columnTableKey, filtersPrefKey, hiddenColumnsPrefKey, recordTableKey, sanitizeFilters, sanitizeHiddenColumns, sanitizeSort, sortPrefKey,
     notificationsPrefKey, sanitizeNotificationPrefs, tableKeyFromFiltersPrefKey, tableKeyFromNotificationsPrefKey, tableKeyFromPrefKey, tableKeyFromSortPrefKey,
     columnWidthsPrefKey, sanitizeColumnWidths, tableKeyFromColumnWidthsPrefKey, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH,
-    sanitizeViewMode,
-    tableKeyFromViewPrefKey,
+    sanitizeSeenAt, sanitizeViewMode,
+    seenPrefKey, tableKeyFromSeenPrefKey, tableKeyFromViewPrefKey,
     viewPrefKey,
 } from "./ui-preferences";
 
@@ -151,5 +151,18 @@ describe("view preferences", () => {
         expect(sanitizeViewMode("lista")).toBe("lista");
         expect(sanitizeViewMode("Linha do tempo")).toBeNull();
         expect(sanitizeViewMode(3)).toBeNull();
+    });
+});
+
+describe("seen preferences", () => {
+    it("keys a page and keeps only a timestamp the database could have written", () => {
+        expect(seenPrefKey("dashboard")).toBe("seen:dashboard");
+        expect(tableKeyFromSeenPrefKey("seen:dashboard")).toBe("dashboard");
+        expect(tableKeyFromSeenPrefKey("view:dashboard")).toBeNull();
+        expect(sanitizeSeenAt("2026-10-12T15:22:01.123456+00:00")).toBe("2026-10-12T15:22:01.123456+00:00");
+        expect(sanitizeSeenAt("2026-10-12T15:22:01Z")).toBe("2026-10-12T15:22:01Z");
+        expect(sanitizeSeenAt("2026-10-12")).toBeNull();
+        expect(sanitizeSeenAt("2026-13-45T99:99:99Z")).toBeNull();
+        expect(sanitizeSeenAt(1760300000)).toBeNull();
     });
 });
